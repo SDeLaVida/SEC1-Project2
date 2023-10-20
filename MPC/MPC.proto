@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package MPC;
+option go_package = "example.com/sec_2;MPC";
+
+// Needs work here mainly what is a chunk. an int and what is a request. Probably nothing.
+service MPC {
+    rpc sendChunk (Request) returns (Reply) {}
+    rpc sendResult (Result) returns (Reply) {}
+}
+
+message Request {
+    int32 id = 1;
+    int32 chunk = 2;
+}
+
+message Result {
+    int32 id = 1;
+    int32 result = 2;
+}
+
+message Reply {
+    string reply = 1;
+} 
