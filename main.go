@@ -178,18 +178,18 @@ func (p *peer) SendResult(ctx context.Context, req *MPC.Result) (*MPC.Reply, err
 
 func splitChunks(secret int, fromId int, n int) map[int32]int {
 	// Split the secret into chunks, while avoiding floating point numbers but still keeping the sum of the chunks equal to the secret
+	n = n - 1 // Minus one because our implementation is 0 indexed
 	remainder := secret
 	chunks := make(map[int32]int)
-	for i := 0; i < n-1; i++ { // n-1 because we want to keep the last chunk as the remainder (might leak information about the previous chunk, but not really? Unsure how you would avoid this)
-		rand := rand.Intn(remainder)
-		// Just go things, as the random generated number will always be between 0 and the parsed value.
-		// Meaning there is a case where the rand is == 0 and this should be accounted for
+	for i := 0; i < n; i++ {
+		rand := rand.Intn(remainder) // There is a case where we send an empty chunk to a patient, i fail to see why it would be a problem other than an edge case where every peer get 0 and we send our raw value to the hospital.
+		// To fix this i would implement a randomization function, that goes from 1 to the value instead.
 		chunks[int32((fromId + i))] = rand
 		fmt.Printf("Iteration %v (for id:%v): Generated following chunk: %v from the remainder: %v and our secret was: %v\n", i, fromId+i, rand, remainder, secret)
 		remainder -= rand
 	}
-	fmt.Printf("Iteration %v (for id:%v): Generated following chunk: %v from the remainder: %v and our secret was: %v\n", n-1, fromId+n-1, remainder, remainder, secret)
-	chunks[int32((fromId + n - 1))] = remainder // The remainder gets parsed to the last peer
+	fmt.Printf("Iteration %v (for id:%v): Parsing the remainder: %v and our secret was: %v\n", n, fromId+n, remainder, secret) // (might leak information about the previous chunk, but not really? Unsure how you would avoid this)
+	chunks[int32((fromId + n))] = remainder // The remainder gets parsed to the last peer
 	return chunks
 
 }
@@ -198,14 +198,6 @@ func (p *peer) SumChunks() int {
 	// Sum the chunks
 	sum := int(0)
 	for _, chunk := range p.chunks {
-		sum += chunk
-	}
-	return sum
-}
-
-func debugSumChunks(chunko []int) int {
-	sum := int(0)
-	for _, chunk := range chunko {
 		sum += chunk
 	}
 	return sum
