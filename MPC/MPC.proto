@@ -3,7 +3,6 @@ syntax = "proto3";
 package MPC;
 option go_package = "example.com/sec_2;MPC";
 
-// Needs work here mainly what is a chunk. an int and what is a request. Probably nothing.
 service MPC {
     rpc sendChunk (Request) returns (Reply) {}
     rpc sendResult (Result) returns (Reply) {}

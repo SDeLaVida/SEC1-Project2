@@ -182,14 +182,22 @@ func splitChunks(secret int, fromId int, n int) map[int32]int {
 	remainder := secret
 	chunks := make(map[int32]int)
 	for i := 0; i < n; i++ {
-		rand := rand.Intn(remainder) // There is a case where we send an empty chunk to a patient, i fail to see why it would be a problem other than an edge case where every peer get 0 and we send our raw value to the hospital.
-		// To fix this i would implement a randomization function, that goes from 1 to the value instead.
-		chunks[int32((fromId + i))] = rand
-		fmt.Printf("Iteration %v (for id:%v): Generated following chunk: %v from the remainder: %v and our secret was: %v\n", i, fromId+i, rand, remainder, secret)
-		remainder -= rand
+		rando := 0
+		if secret < n { 
+			// 0 is ok to send if the user has chosen a secret less than n
+			// 0 can lead to an edge case where the secret value can be deduced by the hospital/patients when every patient gets unlucky and sends 0 chunks to n-1 patients. It actually happens pretty often. Try inputting 1 from each patient.
+			rando = rand.Intn(remainder)
+		} else {
+			// This is preferred but not usable if the value is less than n. 
+			// I probably should have used floating point numbers.
+			rando = improved_rand(remainder)
+		}
+		chunks[int32((fromId + i))] = rando
+		fmt.Printf("Iteration %v (for id:%v): Generated following chunk: %v from the remainder: %v and our secret was: %v\n", i, fromId+i, rando, remainder, secret)
+		remainder -= rando
 	}
-	fmt.Printf("Iteration %v (for id:%v): Parsing the remainder: %v and our secret was: %v\n", n, fromId+n, remainder, secret) // (might leak information about the previous chunk, but not really? Unsure how you would avoid this)
-	chunks[int32((fromId + n))] = remainder // The remainder gets parsed to the last peer
+	fmt.Printf("Iteration %v (for id:%v): Parsing the remainder: %v and our secret was: %v\n", n, fromId+n, remainder, secret)
+	chunks[int32((fromId + n))] = remainder                                                                                    // The remainder gets parsed to the last peer
 	return chunks
 
 }
@@ -225,6 +233,15 @@ func (p *peer) ShareChunks(secret int) {
 		fmt.Printf("Patient (ID: %v): I got reply from patient (id %v):\n %v\n", p.id, id, reply)
 
 	}
+}
+
+func improved_rand(secret int) int {
+	randomized := 0
+	for randomized < 1 {
+		randomized = rand.Intn(secret)
+	}
+	return randomized
+
 }
 
 type peer struct {
