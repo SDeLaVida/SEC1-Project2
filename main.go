@@ -144,7 +144,6 @@ func HospitalLogic(p *peer) {
 	for (len(p.chunks)) < len(p.clients) {
 		// Wait for all the patients to send their chunks. Using a channel to avoid race conditions
 		fmt.Printf("Hospital (ID: %v): Waiting for data from other patients. Got %v out of %v\n", p.id, len(p.chunks), len(p.clients))
-		time.Sleep(2 * time.Second)
 		result := <-p.channel
 		fmt.Printf("Hospital (ID: %v): I just got result %v from id %v\n", p.id, result.Result, result.Id)
 		p.chunks[result.Id] = int(result.Result)
@@ -197,7 +196,7 @@ func splitChunks(secret int, fromId int, n int) map[int32]int {
 		remainder -= rando
 	}
 	fmt.Printf("Iteration %v (for id:%v): Parsing the remainder: %v and our secret was: %v\n", n, fromId+n, remainder, secret)
-	chunks[int32((fromId + n))] = remainder                                                                                    // The remainder gets parsed to the last peer
+	chunks[int32((fromId + n))] = remainder // The remainder gets parsed to the last peer
 	return chunks
 
 }
