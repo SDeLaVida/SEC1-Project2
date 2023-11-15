@@ -16,6 +16,8 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
+var largePrime = int(104729)
+
 /*
 Some of the go specific semantics are inspired by
   - Thor's (from the SWU discord) guide on TLS in GO (LastnameUnknown but is attending the course)
@@ -103,9 +105,12 @@ func main() {
 func patientLogic(p *peer) {
 	// The following logic is at the patient side
 	scanner := bufio.NewScanner(os.Stdin)
-	fmt.Printf("Patient (ID: %v): Enter a number that you want to share with the other patients. This can overflow so be nice :)\n", p.id) // This can overflow, so be nice
+	fmt.Printf("Patient (ID: %v): Enter a number that you want to share with the other patients. This has to be between 0 to %v:)\n", p.id, largePrime) // This can overflow, so be nice
 	for scanner.Scan() {
 		secret, _ := strconv.ParseInt(scanner.Text(), 10, 32)
+		if secret > int64(largePrime) {
+			continue
+		}
 		fmt.Printf("Patient (ID: %v): my secret number is %v. Performing secure aggregation\n", p.id, secret)
 
 		p.ShareChunks(int(secret)) // Break the secret into chunks and send them to the other patients
@@ -178,25 +183,17 @@ func (p *peer) SendResult(ctx context.Context, req *MPC.Result) (*MPC.Reply, err
 func splitChunks(secret int, fromId int, n int) map[int32]int {
 	// Split the secret into chunks, while avoiding floating point numbers but still keeping the sum of the chunks equal to the secret
 	n = n - 1 // Minus one because our implementation is 0 indexed
-	remainder := secret
+	x1x2 := 0
 	chunks := make(map[int32]int)
+
 	for i := 0; i < n; i++ {
-		rando := 0
-		if secret < n { 
-			// 0 is ok to send if the user has chosen a secret less than n
-			// 0 can lead to an edge case where the secret value can be deduced by the hospital/patients when every patient gets unlucky and sends 0 chunks to n-1 patients. It actually happens pretty often. Try inputting 1 from each patient.
-			rando = rand.Intn(remainder)
-		} else {
-			// This is preferred but not usable if the value is less than n. 
-			// I probably should have used floating point numbers.
-			rando = improved_rand(remainder)
-		}
-		chunks[int32((fromId + i))] = rando
-		fmt.Printf("Iteration %v (for id:%v): Generated following chunk: %v from the remainder: %v and our secret was: %v\n", i, fromId+i, rando, remainder, secret)
-		remainder -= rando
+		random := rand.Intn(largePrime)
+		x1x2 += random
+		chunks[int32((fromId + i))] = random
+		fmt.Printf("Iteration %v (for id:%v): Generated following chunk: %v and our secret was: %v\n", i, fromId+i, random, secret)
 	}
-	fmt.Printf("Iteration %v (for id:%v): Parsing the remainder: %v and our secret was: %v\n", n, fromId+n, remainder, secret)
-	chunks[int32((fromId + n))] = remainder // The remainder gets parsed to the last peer
+	fmt.Printf("Iteration %v (for id:%v): Last share is %v - %v mod %v\n", n, fromId+n, secret, x1x2, largePrime)
+	chunks[int32((fromId + n))] = (secret - x1x2) % largePrime // This can be minus
 	return chunks
 
 }
@@ -207,7 +204,7 @@ func (p *peer) SumChunks() int {
 	for _, chunk := range p.chunks {
 		sum += chunk
 	}
-	return sum
+	return sum % largePrime
 }
 
 func (p *peer) ShareChunks(secret int) {
@@ -232,15 +229,6 @@ func (p *peer) ShareChunks(secret int) {
 		fmt.Printf("Patient (ID: %v): I got reply from patient (id %v):\n %v\n", p.id, id, reply)
 
 	}
-}
-
-func improved_rand(secret int) int {
-	randomized := 0
-	for randomized < 1 {
-		randomized = rand.Intn(secret)
-	}
-	return randomized
-
 }
 
 type peer struct {

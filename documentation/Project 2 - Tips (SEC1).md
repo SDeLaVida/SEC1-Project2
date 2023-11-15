@@ -1,4 +1,4 @@
-- [ ] Project 2 (SEC1): [[Project 2 - Description (SEC1)]] [[Project 2 - Tips (SEC1)]] 📅 2023-10-31 
+- [x] Project 2 (SEC1): [[Project 2 - Description (SEC1)]] [[Project 2 - Tips (SEC1)]] 📅 2023-10-31 ✅ 2023-10-31
 ## Problem
 - We don't want anyone to know the data
 - We don't want anyone to modify the data
