@@ -6,7 +6,7 @@
 secret = vælger et tal
 x1 = random tal mellem 0 .. 10.000
 x2 = random tal mellem 0 .. 10.000
-x3 = secret - (x1 + x2) mod 10.000
+x3 = secret - ((x1 + x2) mod 10.000)
 
 NOTE: (x1 + x2 + x3) mod 10.000 = secret (This would be how to find alice secret from the chunks)
 
@@ -14,13 +14,13 @@ NOTE: (x1 + x2 + x3) mod 10.000 = secret (This would be how to find alice secret
 secret = vælger et tal
 y1 = random tal mellem 0 .. 10.000
 y2 = random tal mellem 0 .. 10.000
-y3 = secret - (y1 + y2) mod 10.000
+y3 = (secret - (y1 + y2)) mod 10.000
 
 ##Charlie
 secret = vælger et tal
 z1 = random tal mellem 0 .. 10.000
 z2 = random tal mellem 0 .. 10.000
-z3 = secret - (z1 + z2) mod 10.000
+z3 = (secret - (z1 + z2)) mod 10.000
 
 #Step 2 -> Alle deler deres secrets med hinanden
 
@@ -32,7 +32,7 @@ Charlie: z1 z2 z3 -> alice bob charlie
 #Step 3 -> Alle har modtaget shares fra hinanden og udregner nu aggregated value
 
 Alice: aliceAgg = (x2 + y3 + z1) mod 10.000
-charlie: charlieAgg = (x1 + y2 + z3 ) mod 10.000
+charlie: charlieAgg = (x1 + y2 + z3 ) mod 10.000	
 bob: bobAgg = x3 + y1 + z2) mod 10.000
 
 

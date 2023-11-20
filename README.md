@@ -77,102 +77,60 @@ For this algorithm to work, we have to assume that
 > - This would result in the patients having all the aggregated values, which they can sum and send to the hospital.
 > - The hospital would then receive the total sum from n parties, where n is the amount of patients.
 
+
+> **NOTE:** Go implements modulo in a non obvious way, that ultimately leads to at chance that the aggregated values are negative. 
+> 
+> This might not be optimal for the algorithm but the end result ends up correct. I could have used the BigInt implementation of modulo, but due to a limitation with grpc we would end up loosing information when sending the integers while also making the code a lot more complicated.  
+
 # Building blocks
 
 This program is made using peer to peer . Meaning the parties will act as both the server and the client. We will in the implementation also treat both the patients and the hospital as a client.
 
 When i use "peer" in the following explanation it will refer to both the patients and the hospital and will be used to explain a general concept of the implementation.
 
-I will use patient and hospital respectively when addressing a specific peer type and their behavior in the program.
+I will use patient and hospital respectively when addressing a specific peer type and their behavior in the program. 
 
 ## TLS
 
-We use TLS to avoid message tampering and to keep all communication private between the peers. This will be our best protection against a dolev-yao adversary.
+We use TLS to avoid message tampering and to keep all communication private between the peers. This will be our best protection against a dolev-yao adversary. TLS guarantees confidentiality through a combination of symmetric and asymmetric encryption, integrity with MAC, and authenticity with digital signatures.
 
 In order to do this I generate a certificate using OpenSSL. I sign it using localhost. This however is not ideal and it would be best to use a proper certificate authority. For this assignment it is however okay to use localhost.
 
 In the case that we did want to use a proper certificate authority we would need to do minimum code changes in the go file, such that we can handle the case where the certificate is not valid.
 
 We would also need to generate a certificate for each peer, instead of the one certificate to rule them all implementation that we have right now.
-
-We create our TLS configuration with the following code snippet
-
-```bash
-openssl req -nodes -x509 -sha256 -newkey rsa:4096 -keyout certificate/priv.key -out certificate/server.crt -days 356 -subj "/C=DK/ST=Copenhagen/L=Copenhagen/O=Me/OU=mpc/CN=localhost" -addext "subjectAltName = DNS:localhost,IP:0.0.0.0"
-```
-
-Now that the configuration has been generated we can use it with the credentials library from the standard go library.
-
-We use and declare our TLS configuration in go with the following code snippet
-
-```go
- serverCert, err := credentials.NewServerTLSFromFile("certificate/server.crt", "certificate/priv.key")
- if err != nil {
-  log.Fatalln("failed to create cert", err)
- }
-```
-
-This will be a peers own TLS record.
-
-We will also need to create a new for each client peer we connect to.
-
-```go
- //Set up client connections with TLS
-  clientCert, err := credentials.NewClientTLSFromFile("certificate/server.crt", "")
-  if err != nil {
-   log.Fatalln("failed to create cert", err)
-  }
-```
-
-```go
-  // Dial the server, and store the connection in the clients map
-  conn, err := grpc.Dial(fmt.Sprintf("localhost:%v", port), grpc.WithTransportCredentials(clientCert), grpc.WithBlock())
-  if err != nil {
-   log.Fatalf("Patient (ID: %v):did not connect: %s", p.id, err)
-  }
-```
-
 This will establish a tls connection with all the other peers.
-
-Now that the connection is established in a secure way. (apart from the fact that we use the same certificate for all the peers) we can let go handle the tls and communication implementation.
-
-It has been abstracted away which is fine as TLS is not the focus of the assignment.
 
 ## Secure multi-party computation
 
 ### Chunking
 
-The user can now input their "secret" value and the algorithm will run.
+The user can now input their "secret" value and the algorithm will run. The field i have chosen is between {0 .. p} where p = 104729
+
+I have chosen p arbitrarily, but this could easily be changed to a larger or smaller prime if needed.
 
 We first split this secret into chunks using the following function. We need the secret to be split into chunks equal to the total number of patients. Which in our case is 3 patients. One chunk for the patient themselves and one for each of the other patients. The hospital doesn't get one.
 
-This number also has to be random generated, we do that using a non-negative pseudo-random number generator in the std go library, with the only rule that the total sum of the chunks should be equal to the secret.
+This number also has to be random generated, we do that using a non-negative pseudo-random number generator in the std go library, where the total sum of the chunks modulo 104729 should be equal to the secret.
+
+We generate all chunks up to $n_{-1}$ by choosing a random number between ${0 .. p}$ and for the nth value we calculate it with the following formular $p_n = secret - ({p_1 + p_2 +... + p_{n-1}}) \mod { 104729}$
 
 ```go
 func splitChunks(secret int, fromId int, n int) map[int32]int {
- // Split the secret into chunks, while avoiding floating point numbers but still keeping the sum of the chunks equal to the secret
- n = n - 1 // Minus one because our implementation is 0 indexed
- remainder := secret
- chunks := make(map[int32]int)
- for i := 0; i < n; i++ {
-  rando := 0
-  if secret < n { 
-   // 0 is ok to send if the user has chosen a secret less than n
-   // 0 can lead to an edge case where the secret value can be deduced by the hospital/patients when every patient gets unlucky and sends 0 chunks to n-1 patients. It actually happens pretty often. Try inputting 1 from each patient.
-   rando = rand.Intn(remainder)
-  } else {
-   // This is preferred but not usable if the value is less than n. 
-   // I probably should have used floating point numbers.
-   rando = improved_rand(remainder)
-  }
-  chunks[int32((fromId + i))] = rando
-  fmt.Printf("Iteration %v (for id:%v): Generated following chunk: %v from the remainder: %v and our secret was: %v\n", i, fromId+i, rando, remainder, secret)
-  remainder -= rando
- }
- fmt.Printf("Iteration %v (for id:%v): Parsing the remainder: %v and our secret was: %v\n", n, fromId+n, remainder, secret)
- chunks[int32((fromId + n))] = remainder // The remainder gets parsed to the last peer
- return chunks
+	// Split the secret into chunks, while avoiding floating point numbers but still keeping the sum of the chunks equal to the secret
+	n = n - 1 // Minus one because our implementation is 0 indexed
+	x1x2 := 0
+	chunks := make(map[int32]int)
 
+	for i := 0; i < n; i++ {
+		random := rand.Intn(largePrime)
+		x1x2 += random
+		chunks[int32((fromId + i))] = random
+		fmt.Printf("Iteration %v (for id:%v): Generated following chunk: %v and our secret was: %v\n", i, fromId+i, random, secret)
+	}
+	fmt.Printf("Iteration %v (for id:%v): Last share is %v - %v mod %v\n", n, fromId+n, secret, x1x2, largePrime)
+	chunks[int32((fromId + n))] = (secret - x1x2) % largePrime // This can be minus
+	return chunks
 }
 ```
 

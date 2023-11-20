@@ -2,3 +2,4 @@ certificate/*
 !certificate/how_to_generate.md
 bruh
 *.zip
+Output/
